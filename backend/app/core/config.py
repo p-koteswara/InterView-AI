@@ -16,6 +16,15 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     gemini_api_key: str = ""
 
+    @property
+    def effective_gemini_api_key(self) -> str:
+        import os
+        return (
+            self.gemini_api_key.strip()
+            or os.environ.get("GEMINI_API_KEY", "").strip()
+            or os.environ.get("GOOGLE_API_KEY", "").strip()
+        )
+
     model_config = SettingsConfigDict(
         env_file=BACKEND_ROOT / ".env",
         env_file_encoding="utf-8",
@@ -42,3 +51,4 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+

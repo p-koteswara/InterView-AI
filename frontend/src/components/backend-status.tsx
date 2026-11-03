@@ -172,3 +172,4 @@ export function BackendStatus({ initialHealth, initialError }: BackendStatusProp
     </div>
   );
 }
+

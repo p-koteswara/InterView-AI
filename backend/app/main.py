@@ -7,9 +7,11 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.health import router as health_router
+from app.api.resume import router as resume_router
 from app.core.config import get_settings
 from app.core.logging import setup_logging
 from app.database.session import init_db
+import app.models  # Ensures all ORM models are registered with Base metadata before init_db()
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +52,7 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
     app.include_router(health_router, prefix="/api")
+    app.include_router(resume_router, prefix="/api")
     return app
 
 

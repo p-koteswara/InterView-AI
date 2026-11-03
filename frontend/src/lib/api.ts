@@ -21,3 +21,4 @@ export async function fetchHealth(): Promise<HealthResponse> {
 
   return response.json() as Promise<HealthResponse>;
 }
+

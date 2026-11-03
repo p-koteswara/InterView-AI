@@ -28,3 +28,4 @@ def health_check(db: Session = Depends(get_db)) -> HealthResponse:
         service=settings.app_name,
         database="connected",
     )
+

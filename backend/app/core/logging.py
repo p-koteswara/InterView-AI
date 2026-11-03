@@ -14,3 +14,4 @@ def setup_logging() -> None:
         handlers=[logging.StreamHandler(sys.stdout)],
         force=True,
     )
+

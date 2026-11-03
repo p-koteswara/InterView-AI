@@ -4,3 +4,6 @@ sqlalchemy>=2.0.36
 pydantic-settings>=2.7.0
 python-dotenv>=1.0.1
 httpx>=0.28.0
+python-multipart>=0.0.20
+pymupdf>=1.25.0
+google-genai>=2.3.0

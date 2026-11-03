@@ -1,0 +1,6 @@
+{
+  "memory": {
+    "enableManagedAutoMemory": true
+  },
+  "$version": 4
+}

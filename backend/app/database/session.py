@@ -27,3 +27,4 @@ def get_db() -> Generator[Session, None, None]:
 def init_db() -> None:
     """Initialize database tables for registered SQLAlchemy models."""
     Base.metadata.create_all(bind=engine)
+
