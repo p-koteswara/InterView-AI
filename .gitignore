@@ -21,6 +21,8 @@ frontend/.env.local
 *.sqlite
 *.sqlite3
 chroma_data/
+chroma_db/
+backend/chroma_db/
 vector_store/
 
 # Node.js & Next.js

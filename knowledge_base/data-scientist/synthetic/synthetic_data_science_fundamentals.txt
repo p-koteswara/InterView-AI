@@ -1,0 +1,19 @@
+SYNTHETIC SAMPLE DOCUMENT
+
+This file is generated placeholder content for the InterView AI retrieval pipeline. It is not an excerpt from any published book and must not be presented to candidates as reference material. Replace it with real role curricula before production use.
+
+HYPOTHESIS TESTING AND P VALUES
+
+A hypothesis test starts from a null hypothesis of no effect and asks how surprising the observed data would be if that null were true. The p-value is the probability of seeing a result at least as extreme as the observed one under the null; it is not the probability that the null is true, and it is not the probability that the result will replicate. A significance threshold of 0.05 means that five percent of true null hypotheses will be rejected by chance, so testing many hypotheses inflates the false positive rate unless a correction such as Bonferroni or Benjamini-Hochberg is applied. A confidence interval is usually more informative than a bare p-value because it reports the plausible range of effect sizes, and a statistically significant result with a negligible effect size has little product value.
+
+EXPERIMENT DESIGN AND A B TESTING
+
+A controlled experiment assigns units at random to a treatment and a control group, and randomization is what licenses a causal interpretation. The unit of randomization must match the unit of analysis; randomizing sessions while analyzing users produces correlated observations and understated standard errors. Power analysis determines the sample size needed to detect an effect of a given size, and underpowered experiments produce a winner's curse where only inflated effects reach significance. Peeking at results repeatedly and stopping when the difference looks significant inflates false positives, so sequential testing or a pre-registered duration is required. Common validity threats include sample ratio mismatch, novelty effects, and interference between groups in marketplaces.
+
+STATISTICS FOR DECISION MAKING
+
+Estimators have sampling distributions, and the standard error quantifies their variability. The central limit theorem justifies normal approximations for means of independent samples, but heavy-tailed metrics such as revenue per user converge slowly and are better summarized with trimmed means or bootstrapped intervals. Correlation does not imply causation, and the three common causal shortcuts are selection bias, confounding, and reverse causality. Regression adjustment can control for observed confounders but cannot fix unmeasured ones, which is why quasi-experimental designs such as difference-in-differences or instrumental variables exist.
+
+DATA WRANGLING AND FEATURE ENGINEERING
+
+Real analysis begins with cleaning. Missing data is not one problem but three: missing completely at random, missing at random conditional on observed variables, and missing not at random, where the absence itself carries information. Dropping rows is only unbiased in the first case. Joins are the usual source of silent errors, and a many-to-many join without validation multiplies row counts and distorts every downstream aggregate, so cardinality should be asserted before and after. Leakage occurs when a feature encodes information unavailable at prediction time, and it produces offline metrics that no production system can reproduce. Temporal splits, where validation data always follows training data, are mandatory for any time-dependent model.

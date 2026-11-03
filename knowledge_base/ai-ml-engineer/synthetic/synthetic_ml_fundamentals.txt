@@ -1,0 +1,23 @@
+SYNTHETIC SAMPLE DOCUMENT
+
+This file is generated placeholder content for the InterView AI retrieval pipeline. It is not an excerpt from any published book and must not be presented to candidates as reference material. Replace it with real role curricula before production use.
+
+SUPERVISED LEARNING BASICS
+
+Supervised learning fits a function that maps input features to a labelled target. The training objective minimizes an empirical loss over the training set, usually mean squared error for regression and cross-entropy for classification. A model that fits the training distribution closely but fails to generalize is overfitting; a model too simple to capture the underlying structure underfits. The bias-variance decomposition explains this trade-off: high-bias models make strong assumptions and miss relevant patterns, while high-variance models react to noise in the training sample. Interviewers typically expect a candidate to explain why adding more data reduces variance but does not reduce bias.
+
+OPTIMIZATION AND GRADIENT DESCENT
+
+Gradient descent is a first-order optimizer that updates parameters in the direction of the negative gradient of the loss. The learning rate controls step size: too large and the loss oscillates or diverges, too small and training stalls. Mini-batch stochastic gradient descent estimates the gradient from a small sample, trading gradient noise for throughput. Momentum accumulates a velocity term to smooth updates across noisy directions, and Adam rescales per-parameter step sizes using running estimates of the first and second moments. Learning rate schedules such as cosine decay or warmup are standard for training deep networks, and a candidate should be able to explain what happens to convergence when warmup is removed.
+
+REGULARIZATION AND GENERALIZATION
+
+Regularization constrains model capacity to improve generalization. L2 weight decay penalizes the squared magnitude of weights and shrinks them toward zero, while L1 promotes sparsity by penalizing absolute values. Dropout randomly deactivates units during training, which prevents feature co-adaptation and acts as an ensemble approximation at inference time. Early stopping halts training when validation loss stops improving. Data augmentation encodes known invariances into the training distribution and is often more effective than architectural changes for vision tasks. Cross-validation estimates generalization error by rotating held-out folds, and stratified folds preserve class balance for imbalanced targets.
+
+NEURAL NETWORK ARCHITECTURES
+
+Convolutional networks exploit spatial locality and weight sharing, using stacked filters to build hierarchical feature representations. Pooling layers downsample activations and increase the receptive field. Transformers replace recurrence with self-attention, letting each position attend to every other position in a sequence; multi-head attention learns several relation subspaces in parallel. Because attention has no inherent ordering, positional encodings inject sequence position. Layer normalization stabilizes activation scale and is applied per token in transformer blocks. Residual connections provide a short gradient path that makes very deep networks trainable.
+
+EVALUATION METRICS
+
+Classification quality depends on the metric matching the decision cost. Accuracy is misleading on imbalanced data, where a majority-class predictor scores well while being useless. Precision measures the fraction of positive predictions that are correct, and recall measures the fraction of true positives that were retrieved; the F1 score is their harmonic mean. The precision-recall curve is preferred over the ROC curve when the positive class is rare. For regression, mean absolute error is robust to outliers while root mean squared error penalizes them heavily. Calibration matters whenever predicted probabilities feed a downstream threshold: a model can rank well and still be badly calibrated.

@@ -1,0 +1,23 @@
+SYNTHETIC SAMPLE DOCUMENT
+
+This file is generated placeholder content for the InterView AI retrieval pipeline. It is not an excerpt from any published book and must not be presented to candidates as reference material. Replace it with real role curricula before production use.
+
+HTTP SEMANTICS AND API DESIGN
+
+A backend service exposes resources over HTTP and the method chosen carries meaning. GET is safe and cacheable, PUT and DELETE are idempotent, and POST is neither. Retrying a non-idempotent POST without an idempotency key can create duplicate records, which is why payment and order endpoints usually accept a client-supplied key. Status codes should describe the outcome precisely: 400 for malformed requests, 401 for missing credentials, 403 for insufficient permission, 404 for absent resources, 409 for conflicting state, 422 for semantically invalid payloads, and 429 when a client is rate limited. Backwards compatibility matters because clients deploy independently of the server. Additive fields are safe, removals are breaking, and versioning strategy should be decided before the first external consumer integrates.
+
+DATABASE INDEXING AND QUERY PLANNING
+
+An index trades write throughput and storage for read latency. A B-tree index supports equality and range predicates and keeps entries ordered, so a composite index on (tenant_id, created_at) can serve both filtering and ordering for a tenant-scoped feed. Column order in a composite index matters: the leading column must appear in the predicate for the index to be usable. Writing a function or cast around an indexed column usually prevents index use. The query planner chooses between sequential scans and index scans using table statistics, so stale statistics after a bulk load can produce a pathological plan. Covering indexes avoid heap lookups by including all selected columns, and partial indexes restrict coverage to a hot subset of rows.
+
+TRANSACTIONS AND CONSISTENCY
+
+ACID properties define the guarantees a transaction provides: atomicity ensures all statements commit or none do, consistency preserves declared invariants, isolation controls visibility between concurrent transactions, and durability survives process failure. The default isolation level of many databases is read committed, which still permits non-repeatable reads; a transaction that reads a value and later writes based on it should use a stronger level or an explicit row lock. Lost updates are the classic failure mode of read-modify-write logic without locking. Long-running transactions hold locks and bloat the write-ahead log, so background jobs that touch many rows should batch their work.
+
+CACHING AND BACKPRESSURE
+
+A cache in front of a database reduces read load but introduces staleness. Time-to-live expiry bounds staleness at the cost of occasional refetches, while write-through invalidation keeps the cache consistent at the cost of coupling writes to cache health. The classic failure is a thundering herd: a popular key expires and thousands of concurrent requests miss simultaneously and stampede the database, so request coalescing or probabilistic early expiry is needed. Backpressure protects a service from overload by rejecting, queueing or shedding work when the arrival rate exceeds capacity. Unbounded queues convert overload into latency and memory exhaustion; bounded queues with explicit rejection fail fast and keep the system responsive.
+
+OBSERVABILITY AND RELIABILITY
+
+Production reliability depends on measuring what users experience. Latency percentiles matter more than averages because averages hide tail behaviour, and p99 latency is usually driven by queueing or a small number of pathological requests. Structured logs, metrics and distributed traces answer different questions: logs explain a single event, metrics show aggregate trends, and traces show where time is spent across service boundaries. Health checks should distinguish liveness, which decides whether a process must be restarted, from readiness, which decides whether traffic should be routed to it. Timeouts and retries must be paired with jittered backoff, since synchronized retries turn a brief outage into a sustained one.

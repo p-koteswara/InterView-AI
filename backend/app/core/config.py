@@ -7,6 +7,8 @@ BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
 DEFAULT_GEMINI_FALLBACK_MODEL = "gemini-3-flash-preview"
+DEFAULT_EMBEDDING_MODEL = "gemini-embedding-001"
+DEFAULT_EMBEDDING_DIMENSIONS = 768
 
 
 class Settings(BaseSettings):
@@ -20,6 +22,13 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = DEFAULT_GEMINI_MODEL
     gemini_fallback_model: str = DEFAULT_GEMINI_FALLBACK_MODEL
+
+    # Retrieval-augmented generation (ChromaDB vector store)
+    embedding_model: str = DEFAULT_EMBEDDING_MODEL
+    embedding_dimensions: int = DEFAULT_EMBEDDING_DIMENSIONS
+    chroma_db_path: str = "./chroma_db"
+    chroma_collection: str = "knowledge_chunks"
+    knowledge_base_dir: str = "../knowledge_base"
 
     @property
     def effective_gemini_api_key(self) -> str:
@@ -48,6 +57,22 @@ class Settings(BaseSettings):
             if name not in candidates:
                 candidates.append(name)
         return candidates
+
+    @property
+    def resolved_chroma_path(self) -> Path:
+        """Absolute path of the persistent ChromaDB directory."""
+        path = Path(self.chroma_db_path)
+        if not path.is_absolute():
+            path = (BACKEND_ROOT / path).resolve()
+        return path
+
+    @property
+    def resolved_knowledge_base_path(self) -> Path:
+        """Absolute path of the role-partitioned knowledge base corpus."""
+        path = Path(self.knowledge_base_dir)
+        if not path.is_absolute():
+            path = (BACKEND_ROOT / path).resolve()
+        return path
 
     @property
     def cors_origin_list(self) -> list[str]:
