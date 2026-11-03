@@ -5,6 +5,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
+DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
+DEFAULT_GEMINI_FALLBACK_MODEL = "gemini-3-flash-preview"
+
 
 class Settings(BaseSettings):
     """Runtime application settings loaded from environment and .env."""
@@ -15,6 +18,8 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./interview_ai.db"
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     gemini_api_key: str = ""
+    gemini_model: str = DEFAULT_GEMINI_MODEL
+    gemini_fallback_model: str = DEFAULT_GEMINI_FALLBACK_MODEL
 
     @property
     def effective_gemini_api_key(self) -> str:
@@ -30,6 +35,19 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @property
+    def gemini_model_candidates(self) -> list[str]:
+        """Ordered, de-duplicated Gemini models to try: primary then fallback."""
+        names = [
+            (self.gemini_model or "").strip() or DEFAULT_GEMINI_MODEL,
+            (self.gemini_fallback_model or "").strip() or DEFAULT_GEMINI_FALLBACK_MODEL,
+        ]
+        candidates: list[str] = []
+        for name in names:
+            if name not in candidates:
+                candidates.append(name)
+        return candidates
 
     @property
     def cors_origin_list(self) -> list[str]:

@@ -47,9 +47,86 @@ def _clean_json_output(raw_text: str) -> str:
     return text
 
 
+#: Provider status codes that indicate a transient problem (rate limiting or
+#: capacity) where retrying against a different model may still succeed.
+RETRYABLE_STATUS_CODES = frozenset({429, 503})
+
+
+def _is_retryable_api_error(exc: APIError) -> bool:
+    """True only for transient provider errors that justify a fallback attempt."""
+    code = getattr(exc, "code", None)
+    return isinstance(code, int) and code in RETRYABLE_STATUS_CODES
+
+
+def _request_profile(client: genai.Client, model: str, prompt: str) -> CandidateProfile:
+    """Run one structured-extraction request against a single model."""
+    response = client.models.generate_content(
+        model=model,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=EXTRACTION_SYSTEM_INSTRUCTION,
+            response_mime_type="application/json",
+            response_schema=CandidateProfile,
+            temperature=0.1,
+        ),
+    )
+
+    if not response or not response.text:
+        raise ProfileExtractionError("Gemini returned an empty response during profile extraction.")
+
+    return CandidateProfile.model_validate(json.loads(_clean_json_output(response.text)))
+
+
+def _extract_with_fallback(
+    client: genai.Client,
+    models: list[str],
+    prompt: str,
+) -> CandidateProfile:
+    """
+    Try each configured model in order.
+
+    Falls back only on transient availability errors; any other failure
+    propagates immediately so genuine errors are never masked.
+    """
+    for index, model in enumerate(models):
+        try:
+            profile = _request_profile(client, model, prompt)
+        except APIError as exc:
+            if not _is_retryable_api_error(exc):
+                raise
+
+            fallback_model = models[index + 1] if index + 1 < len(models) else None
+            if fallback_model is None:
+                logger.error(
+                    "Gemini model '%s' is temporarily unavailable (%s) and no fallback remains.",
+                    model,
+                    exc.code,
+                )
+                raise
+
+            logger.warning(
+                "Gemini model '%s' is temporarily unavailable (%s); retrying with fallback '%s'.",
+                model,
+                exc.code,
+                fallback_model,
+            )
+            continue
+
+        logger.info("Extracted candidate profile using model '%s'.", model)
+        return profile
+
+    raise ProfileExtractionError(
+        "AI service configuration missing: no Gemini model is configured.",
+        status_code=503,
+    )
+
+
 def extract_candidate_profile(resume_text: str) -> CandidateProfile:
     """
-    Extract a structured CandidateProfile from raw resume text using Gemini 3.8 Flash.
+    Extract a structured CandidateProfile from raw resume text.
+
+    Uses the configured primary Gemini model, falling back to the configured
+    fallback model when the primary reports a temporary availability error.
     """
     settings = get_settings()
 
@@ -62,36 +139,21 @@ def extract_candidate_profile(resume_text: str) -> CandidateProfile:
             status_code=503,
         )
 
+    prompt = (
+        "Extract the candidate's structured profile from the following resume text:\n\n"
+        "--- START OF RESUME TEXT ---\n"
+        f"{resume_text}\n"
+        "--- END OF RESUME TEXT ---"
+    )
+
     try:
         client = genai.Client(api_key=api_key)
-
-        prompt = (
-            "Extract the candidate's structured profile from the following resume text:\n\n"
-            "--- START OF RESUME TEXT ---\n"
-            f"{resume_text}\n"
-            "--- END OF RESUME TEXT ---"
-        )
-
-        response = client.models.generate_content(
-            model="gemini-3.8-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=EXTRACTION_SYSTEM_INSTRUCTION,
-                response_mime_type="application/json",
-                response_schema=CandidateProfile,
-                temperature=0.1,
-            ),
-        )
-
-        if not response or not response.text:
-            raise ProfileExtractionError("Gemini returned an empty response during profile extraction.")
-
-        cleaned = _clean_json_output(response.text)
-        data = json.loads(cleaned)
-        profile = CandidateProfile.model_validate(data)
+        profile = _extract_with_fallback(client, settings.gemini_model_candidates, prompt)
         logger.info("Successfully extracted candidate profile for: %s", profile.name or "Unknown")
         return profile
 
+    except ProfileExtractionError:
+        raise
     except APIError as exc:
         logger.exception("Gemini API error during resume extraction: %s", exc)
         raise ProfileExtractionError(
@@ -105,8 +167,6 @@ def extract_candidate_profile(resume_text: str) -> CandidateProfile:
             status_code=502,
         ) from exc
     except Exception as exc:
-        if isinstance(exc, ProfileExtractionError):
-            raise
         logger.exception("Unexpected error during profile extraction: %s", exc)
         raise ProfileExtractionError(
             f"An unexpected error occurred while analyzing candidate profile: {str(exc)}",

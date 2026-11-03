@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { BackendStatus } from "@/components/backend-status";
 import { fetchHealth, type HealthResponse } from "@/lib/api";
 
@@ -18,6 +19,14 @@ export default async function HomePage() {
         <p className="mt-4 text-base sm:text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
           AI-driven candidate screening platform combining automated resume analysis, domain-grounded RAG interview workflows, and deep competency scoring.
         </p>
+        <div className="mt-6 flex justify-center">
+          <Link
+            href="/upload"
+            className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400 transition"
+          >
+            Upload a resume
+          </Link>
+        </div>
       </div>
 
       <Suspense fallback={<HealthFallback />}>
