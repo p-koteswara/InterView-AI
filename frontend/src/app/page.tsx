@@ -5,7 +5,7 @@ import { fetchHealth, type HealthResponse } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
+export default function HomePage() {
   return (
     <main className="min-h-screen flex flex-col justify-center px-4 py-16 sm:px-6 lg:px-8 bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
       <div className="max-w-3xl mx-auto text-center mb-10">
@@ -66,4 +66,3 @@ function HealthFallback() {
     </div>
   );
 }
-

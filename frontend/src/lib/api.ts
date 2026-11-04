@@ -49,8 +49,52 @@ export type ResumeUploadResponse = {
   created_at: string;
 };
 
+export type QuestionType = "technical" | "conceptual";
+export type DifficultyLevel = "easy" | "medium" | "hard";
+
+export type InterviewQuestion = {
+  id: string;
+  position: number;
+  text: string;
+  question_type: QuestionType;
+  difficulty: DifficultyLevel;
+  topic: string;
+  rationale: string | null;
+  source_document: string | null;
+  source_section: string | null;
+};
+
+export type InterviewSession = {
+  session_id: string;
+  candidate_id: string;
+  role: string;
+  role_title: string;
+  focus_skills: string[];
+  created_at: string;
+  questions: InterviewQuestion[];
+};
+
+export type AnswerRecord = {
+  id: string;
+  session_id: string;
+  question_id: string;
+  question_position: number;
+  answer_text: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SessionAnswers = {
+  session_id: string;
+  total_questions: number;
+  answered_count: number;
+  answers: AnswerRecord[];
+};
+
 /** Mirrors the limits enforced by the backend resume parser. */
 export const MAX_RESUME_SIZE_BYTES = 10 * 1024 * 1024;
+/** Mirrors MAX_ANSWER_LENGTH in the backend answer schema. */
+export const MAX_ANSWER_LENGTH = 20000;
 export const ALLOWED_RESUME_EXTENSIONS = [".pdf", ".txt"] as const;
 
 export function getApiBaseUrl(): string {
@@ -58,7 +102,7 @@ export function getApiBaseUrl(): string {
   return baseUrl.replace(/\/$/, "");
 }
 
-async function readErrorMessage(response: Response): Promise<string> {
+export async function readErrorMessage(response: Response, action: string): Promise<string> {
   try {
     const body: unknown = await response.json();
     if (body && typeof body === "object" && "detail" in body) {
@@ -84,7 +128,25 @@ async function readErrorMessage(response: Response): Promise<string> {
     // Response had no JSON body; fall back to the generic message below.
   }
 
-  return `Resume upload failed with status ${response.status}`;
+  return `${action} failed with status ${response.status}`;
+}
+
+/** Fetch a JSON endpoint, turning transport and API errors into readable messages. */
+async function requestJson<T>(url: string, init: RequestInit, action: string): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(url, init);
+  } catch {
+    throw new Error(
+      `Unable to reach the backend service at ${getApiBaseUrl()}. Ensure the FastAPI server is running.`,
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, action));
+  }
+
+  return response.json() as Promise<T>;
 }
 
 export async function uploadResume(file: File): Promise<ResumeUploadResponse> {
@@ -104,10 +166,141 @@ export async function uploadResume(file: File): Promise<ResumeUploadResponse> {
   }
 
   if (!response.ok) {
-    throw new Error(await readErrorMessage(response));
+    throw new Error(await readErrorMessage(response, "Resume upload"));
   }
 
   return response.json() as Promise<ResumeUploadResponse>;
+}
+
+export async function fetchInterviewSession(sessionId: string): Promise<InterviewSession> {
+  return requestJson<InterviewSession>(
+    `${getApiBaseUrl()}/api/interviews/${encodeURIComponent(sessionId)}`,
+    { cache: "no-store" },
+    "Loading the interview",
+  );
+}
+
+export async function fetchSessionAnswers(sessionId: string): Promise<SessionAnswers> {
+  return requestJson<SessionAnswers>(
+    `${getApiBaseUrl()}/api/interviews/${encodeURIComponent(sessionId)}/answers`,
+    { cache: "no-store" },
+    "Loading saved answers",
+  );
+}
+
+export async function submitAnswer(
+  sessionId: string,
+  questionId: string,
+  answerText: string,
+): Promise<AnswerRecord> {
+  return requestJson<AnswerRecord>(
+    `${getApiBaseUrl()}/api/interviews/${encodeURIComponent(sessionId)}/questions/${encodeURIComponent(questionId)}/answers`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answer_text: answerText }),
+    },
+    "Saving the answer",
+  );
+}
+
+export type AnswerEvaluation = {
+  id: string;
+  answer_id: string;
+  session_id: string;
+  question_id: string;
+  question_position: number;
+  technical_score: number;
+  relevance_score: number;
+  depth_score: number;
+  clarity_score: number;
+  overall_score: number;
+  feedback: string;
+  improvements: string[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type InterviewReport = {
+  id: string;
+  session_id: string;
+  candidate_id: string;
+  candidate_name: string;
+  role: string;
+  role_title: string;
+  interview_date: string | null;
+  question_count: number;
+  answered_count: number;
+  overall_score: number;
+  strengths: string[];
+  weaknesses: string[];
+  recommended_topics: string[];
+  assessment: string;
+  evaluations: AnswerEvaluation[];
+};
+
+export type SessionEvaluationsResponse = {
+  session_id: string;
+  total_questions: number;
+  answered_count: number;
+  evaluated_count: number;
+  evaluations: AnswerEvaluation[];
+};
+
+export async function fetchInterviewEvaluations(sessionId: string): Promise<SessionEvaluationsResponse> {
+  return requestJson<SessionEvaluationsResponse>(
+    `${getApiBaseUrl()}/api/interviews/${encodeURIComponent(sessionId)}/evaluations`,
+    { cache: "no-store" },
+    "Loading answer evaluations",
+  );
+}
+
+export async function evaluateInterview(sessionId: string): Promise<SessionEvaluationsResponse> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${getApiBaseUrl()}/api/interviews/${encodeURIComponent(sessionId)}/evaluations`,
+      { method: "POST" },
+    );
+  } catch {
+    throw new Error(
+      `Unable to reach the backend service at ${getApiBaseUrl()}. Ensure the FastAPI server is running.`,
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Evaluating the interview answers"));
+  }
+
+  return response.json() as Promise<SessionEvaluationsResponse>;
+}
+
+export async function fetchInterviewReport(sessionId: string): Promise<InterviewReport> {
+  return requestJson<InterviewReport>(
+    `${getApiBaseUrl()}/api/interviews/${encodeURIComponent(sessionId)}/report`,
+    { cache: "no-store" },
+    "Loading the interview report",
+  );
+}
+
+export async function generateInterviewReport(sessionId: string): Promise<InterviewReport> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${getApiBaseUrl()}/api/interviews/${encodeURIComponent(sessionId)}/report`,
+      { method: "POST" },
+    );
+  } catch {
+    throw new Error(
+      `Unable to reach the backend service at ${getApiBaseUrl()}. Ensure the FastAPI server is running.`,
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Generating the interview report"));
+  }
+
+  return response.json() as Promise<InterviewReport>;
 }
 
 export async function fetchHealth(): Promise<HealthResponse> {

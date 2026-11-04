@@ -1,13 +1,16 @@
 import logging
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import ValidationError
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.job_roles import get_role, role_slugs
 from app.database.session import get_db
 from app.models.candidate import Candidate
-from app.models.interview import InterviewSession, Question
+from app.models.interview import Answer, InterviewSession, Question
+from app.schemas.answer import AnswerResponse, AnswerSubmitRequest, SessionAnswersResponse
 from app.schemas.interview import (
     InterviewCreateRequest,
     InterviewSessionResponse,
@@ -21,6 +24,34 @@ from app.services.question_generator import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/interviews", tags=["interviews"])
+
+
+def _as_utc(value: datetime) -> datetime:
+    """SQLite drops timezone information; every stored timestamp is written in UTC."""
+    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+
+
+def _serialize_answer(answer: Answer, position: int) -> AnswerResponse:
+    """Map a stored answer onto the API response."""
+    return AnswerResponse(
+        id=answer.id,
+        session_id=answer.session_id,
+        question_id=answer.question_id,
+        question_position=position,
+        answer_text=answer.answer_text,
+        created_at=_as_utc(answer.created_at),
+        updated_at=_as_utc(answer.updated_at),
+    )
+
+
+def _get_session_or_404(db: Session, session_id: str) -> InterviewSession:
+    session = db.get(InterviewSession, session_id)
+    if session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Interview session with ID '{session_id}' not found.",
+        )
+    return session
 
 
 def _serialize(session: InterviewSession) -> InterviewSessionResponse:
@@ -152,11 +183,98 @@ def get_interview(
     session_id: str,
     db: Session = Depends(get_db),
 ) -> InterviewSessionResponse:
-    session = db.get(InterviewSession, session_id)
-    if session is None:
+    return _serialize(_get_session_or_404(db, session_id))
+
+
+@router.post(
+    "/{session_id}/questions/{question_id}/answers",
+    response_model=AnswerResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Submit an answer to an interview question",
+    description=(
+        "Records the candidate's answer to one question of the session. The question must "
+        "belong to the session, and each question can be answered exactly once."
+    ),
+)
+def submit_answer(
+    session_id: str,
+    question_id: str,
+    payload: AnswerSubmitRequest,
+    db: Session = Depends(get_db),
+) -> AnswerResponse:
+    session = _get_session_or_404(db, session_id)
+
+    question = db.get(Question, question_id)
+    if question is None or question.session_id != session.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Interview session with ID '{session_id}' not found.",
+            detail=(
+                f"Question with ID '{question_id}' was not found in interview "
+                f"session '{session_id}'."
+            ),
         )
 
-    return _serialize(session)
+    duplicate_detail = (
+        f"Question {question.position} has already been answered. Answers cannot be revised."
+    )
+    if db.query(Answer).filter(Answer.question_id == question.id).first() is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=duplicate_detail)
+
+    answer = Answer(session=session, question=question, answer_text=payload.answer_text)
+
+    try:
+        db.add(answer)
+        db.commit()
+        db.refresh(answer)
+    except IntegrityError as exc:
+        # Lost a race with a concurrent submission for the same question.
+        db.rollback()
+        logger.warning("Rejected duplicate answer for question %s: %s", question.id, exc)
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=duplicate_detail) from exc
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Database error saving answer for question %s: %s", question.id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database failure while saving the answer.",
+        ) from exc
+
+    logger.info(
+        "Persisted answer %s for question %d of session %s",
+        answer.id,
+        question.position,
+        session.id,
+    )
+    return _serialize_answer(answer, question.position)
+
+
+@router.get(
+    "/{session_id}/answers",
+    response_model=SessionAnswersResponse,
+    summary="Get the answers submitted for an interview session",
+    description=(
+        "Retrieves every answer recorded for the session, ordered by question position, "
+        "together with the answered and total question counts."
+    ),
+)
+def get_session_answers(
+    session_id: str,
+    db: Session = Depends(get_db),
+) -> SessionAnswersResponse:
+    session = _get_session_or_404(db, session_id)
+
+    rows = (
+        db.query(Answer, Question.position)
+        .join(Question, Answer.question_id == Question.id)
+        .filter(Answer.session_id == session.id)
+        .order_by(Question.position)
+        .all()
+    )
+    answers = [_serialize_answer(answer, position) for answer, position in rows]
+
+    return SessionAnswersResponse(
+        session_id=session.id,
+        total_questions=len(session.questions),
+        answered_count=len(answers),
+        answers=answers,
+    )

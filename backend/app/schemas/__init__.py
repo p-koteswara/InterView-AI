@@ -1,5 +1,17 @@
 """Pydantic schemas for request and response validation."""
 
+from app.schemas.answer import (
+    MAX_ANSWER_LENGTH,
+    AnswerResponse,
+    AnswerSubmitRequest,
+    SessionAnswersResponse,
+)
+from app.schemas.evaluation import (
+    AnswerEvaluationResponse,
+    FinalReportResult,
+    InterviewReportResponse,
+    SessionEvaluationsResponse,
+)
 from app.schemas.health import HealthResponse
 from app.schemas.interview import (
     DifficultyLevel,
@@ -35,4 +47,12 @@ __all__ = [
     "ExperienceItem",
     "ProjectItem",
     "ResumeUploadResponse",
+    "MAX_ANSWER_LENGTH",
+    "AnswerResponse",
+    "AnswerSubmitRequest",
+    "SessionAnswersResponse",
+    "AnswerEvaluationResponse",
+    "FinalReportResult",
+    "InterviewReportResponse",
+    "SessionEvaluationsResponse",
 ]
